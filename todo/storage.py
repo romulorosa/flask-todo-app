@@ -1,6 +1,7 @@
 import abc
 import csv
 import uuid
+import sqlite3
 
 
 class Storage(metaclass=abc.ABCMeta):
@@ -90,3 +91,57 @@ class FileStorage(Storage):
                 todo_writer.writerow(row)
         return new_data
 
+
+class DatabaseStorage(Storage):
+    _db_path = 'todo_database.db'
+
+    def add_item(self, item, status=None):
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+        status = status or 'Criado'
+        sql = 'INSERT INTO todo_items (item, status) VALUES ("%s", "%s");' % (item, status)
+
+        cursor.execute(sql)
+        conn.commit()
+        conn.close()
+
+        return [cursor.lastrowid, item, status]
+
+    def get_all_items(self):
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+
+        sql = 'SELECT rowid, item, status FROM todo_items;'
+
+        result = cursor.execute(sql).fetchall()
+        return result
+
+    def get_item(self, item_id):
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+
+        sql = 'SELECT rowid, item, status FROM todo_items WHERE rowid=%s;' % (item_id)
+        result = cursor.execute(sql).fetchall()
+        conn.close()
+
+        return list(result[0])
+
+    def update_status(self, item_id, new_status):
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+
+        sql = 'UPDATE todo_items SET status="%s" WHERE rowid=%s;' % (new_status, item_id)
+        cursor.execute(sql)
+        conn.commit()
+
+        return self.get_item(item_id)
+
+    def delete_item(self, item_id):
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+
+        sql = 'DELETE FROM todo_items WHERE rowid=%s;' % item_id
+        cursor.execute(sql)
+        conn.commit()
+
+        return self.get_all_items()
