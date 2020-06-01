@@ -33,24 +33,37 @@ class FileStorage(Storage):
                 quoting=csv.QUOTE_MINIMAL
             )
             item_id = uuid.uuid4()
-            item_row = [str(item_id), item, status or 'Criado']
-            todo_writer.writerow(item_row)
-            return item_row
+            row = [str(item_id), item, status or 'Criado']
+            todo_writer.writerow(row)
+            return {
+                'id': row[0],
+                'item': row[1],
+                'status': row[2],
+            }
 
     def get_all_items(self) -> list:
+        all_items = []
         with open(self._db_path, mode='r') as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
-            return [row for row in csv_reader]
+            for row in csv_reader:
+                all_items.append({'id': row[0], 'item': row[1], 'status': row[2]})
 
-    def get_item(self, item_id: str) -> list:
+        return all_items
+
+    def get_item(self, item_id: str) -> dict:
         with open(self._db_path, mode='r') as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             for row in csv_reader:
                 row_item_id, item, status = row
                 if item_id == row_item_id:
-                    return row
+                    return {
+                        'id': row[0],
+                        'item': row[1],
+                        'status': row[2],
+                    }
 
-    def update_status(self, item_id: str, new_status) :
+    def update_status(self, item_id: str, new_status):
+        updated_data = []
         with open(self._db_path, mode='r') as csv_file:
             csv_reader = csv.reader(csv_file)
             new_data = []
@@ -69,9 +82,12 @@ class FileStorage(Storage):
             )
             for row in new_data:
                 todo_writer.writerow(row)
-        return new_data
+                updated_data.append({'id': row[0], 'item': row[1], 'status': row[2]})
+
+        return updated_data
 
     def delete_item(self, item_id):
+        updated_data = []
         with open(self._db_path, mode='r') as csv_file:
             csv_reader = csv.reader(csv_file)
             new_data = []
@@ -89,7 +105,9 @@ class FileStorage(Storage):
             )
             for row in new_data:
                 todo_writer.writerow(row)
-        return new_data
+                updated_data.append({'id': row[0], 'item': row[1], 'status': row[2]})
+
+        return updated_data
 
 
 class DatabaseStorage(Storage):
@@ -105,16 +123,20 @@ class DatabaseStorage(Storage):
         conn.commit()
         conn.close()
 
-        return [cursor.lastrowid, item, status]
+        return {'id': cursor.lastrowid, 'item': item, 'status': status}
 
     def get_all_items(self):
+        all_items = []
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
 
         sql = 'SELECT rowid, item, status FROM todo_items;'
 
         result = cursor.execute(sql).fetchall()
-        return result
+        for row in result:
+            all_items.append({'id': row[0], 'item': row[1], 'status': row[2]})
+
+        return all_items
 
     def get_item(self, item_id):
         conn = sqlite3.connect(self._db_path)
@@ -124,7 +146,13 @@ class DatabaseStorage(Storage):
         result = cursor.execute(sql).fetchall()
         conn.close()
 
-        return list(result[0])
+        item = result[0]
+
+        return {
+            'id': item[0],
+            'item': item[1],
+            'status': item[2],
+        }
 
     def update_status(self, item_id, new_status):
         conn = sqlite3.connect(self._db_path)
